@@ -40,6 +40,8 @@ bld/
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
+ChapterRandomizer.sln
+ChapterRandomizer.pyproj
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -361,3 +363,16 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+####################
+# Ignore build folder
+ChapterRandomizer/
+
+# Ignore env folder
+env/
+
+# Ignore .ico
+*.ico
+
+# Ignore installer helper
+installer.txt
