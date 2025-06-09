@@ -1,11 +1,10 @@
+#!/usr/bin/env python
 import os
 import sys
-
 # Credits to https://stackoverflow.com/questions/59086193/pyinstaller-onedir-option-exe-file-outside-the-directory
 if getattr(sys, 'frozen', False):
     app_path = os.path.join(os.path.dirname(sys.executable),"lib")
     sys.path.append(app_path) # search this path for modules
-
 import time
 import random
 import argparse
@@ -13,8 +12,9 @@ import glob
 import locale
 from tkinter import Tk, filedialog, messagebox
 from urllib.parse import unquote
-from wakepy import keepawake
+from wakepy import keep
 from pynput.keyboard import Key, Listener
+from messages import get_message
 
 VLC_SUPPORTED_EXT = ('.m2v', '.m4v', '.mpeg1', '.mpeg2', '.mts', '.ogm', '.divx', '.dv', '.flv', '.m1v', '.m2ts', '.mkv', \
                      '.mov', '.mpeg4', '.ts', '.3g2', '.avi', '.mpeg', '.mpg', '.3gp', '.wmv', '.asf', '.mp4', '.m4p')
@@ -24,11 +24,7 @@ sys_lang = locale.getdefaultlocale()[0].split("_")[0]
 try:
     import vlc
 except Exception:
-    if sys_lang == "es":
-        msg = "No se pudo encontrar VLC. Por favor checkeá que esté bien instalado."
-    else:
-        msg = "Failed to detect VLC. Please check it's properly installed."
-    messagebox.showerror("Error", msg)
+    messagebox.showerror("Error", get_message('NO_VLC', sys_lang))
     sys.exit(1)
 
 class ChapterRandomizer():
@@ -51,11 +47,7 @@ class ChapterRandomizer():
             if any(path.lower().endswith(VLC_SUPPORTED_EXT) for path in glob.glob(recursivePath, recursive=True)):
                 isValidPath = True
             else:
-                if sys_lang == "es":
-                    msg = "La carpeta especificada no contiene ningún archivo válido. Por favor intente de nuevo"
-                else:
-                    msg = "The specified path does not contain any playable files. Please try again."
-                messagebox.showerror("Error", msg)
+                messagebox.showerror("Error", get_message('NO_VALID_FILES', sys_lang))
                 self.folderPath = filedialog.askdirectory()
                 if not self.folderPath:
                     sys.exit(0)
@@ -65,11 +57,7 @@ class ChapterRandomizer():
         try:
             vlc.find_lib()
         except Exception:
-            if sys_lang == "es":
-                msg = "No se pudo encontrar VLC. Por favor checkeá que esté bien instalado."
-            else:
-                msg = "Failed to detect VLC. Please check it's properly installed."
-            messagebox.showerror("Error", msg)
+            messagebox.showerror("Error", get_message('NO_VLC', sys_lang))
             sys.exit(1)
 
     def chooseRandomFile(self):
@@ -81,7 +69,11 @@ class ChapterRandomizer():
         return randomFile
 
     def on_press(self, key):
-        """ Key press bindings"""
+        """ Key press bindings
+
+            +:  Forward video by 5 seconds
+            -:  Rewind video by 5 seconds
+        """
         if hasattr(key, "char"):
             if key.char == "+":
                 self.media_player.set_time(self.media_player.get_time() + 5000)
@@ -89,7 +81,11 @@ class ChapterRandomizer():
                 self.media_player.set_time(self.media_player.get_time() - 5000)
 
     def on_release(self, key):
-        """ Key release bindings"""
+        """ Key release bindings
+
+            Esc:    Exit application
+            Space:  Pause/play video
+        """
         if key == Key.esc:
             os._exit(0)
         elif key == Key.space:
@@ -99,17 +95,27 @@ class ChapterRandomizer():
         """ This does the whole thing """
         file = self.chooseRandomFile()
 
-        with keepawake(keep_screen_awake=True):
-            media = vlc.Media(file)
-            self.media_player = vlc.MediaPlayer()
+        media = vlc.Media(file)
+
+        if sys.platform=="win32":
+            options = ["--no-xlib", "--codec=av1", "--avcodec-hw=dxva2", "--verbose=2"]
+        elif sys.platform=="linux":
+            options = ["--no-xlib", "--codec=avcodec", "--avcodec-hw=any", "--verbose=0"]
+            #options = ["--no-xlib", "--avcodec-hw=vaapi", "--verbose=0"]
+        else:
+            options = ["--no-xlib", "--verbose=0",]
+
+        self.instance = vlc.Instance(options)
+        self.media_player = self.instance.media_player_new()
+
+        with keep.presenting():
+
             if self.isNostalgic:
                 logoPath = os.path.abspath("./assets/t3lef3.png")
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
                 self.media_player.video_set_logo_string(vlc.VideoLogoOption.logo_file, logoPath)
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_position, 6)
             self.media_player.set_media(media)
-            self.media_player.video_set_key_input(True)
-            self.media_player.video_set_mouse_input(True)
             self.media_player.set_fullscreen(True)
             self.media_player.play()
 
@@ -117,19 +123,19 @@ class ChapterRandomizer():
             with Listener(on_press=self.on_press, on_release=self.on_release):
                 while True:
                     state = self.media_player.get_state()
-                    if state == vlc.State.Error:
-                        break
-                    elif state.value == vlc.State.Ended:
+                    if state.value == vlc.State.Ended:
                         file = self.chooseRandomFile()
                         media = vlc.Media(file)
                         self.media_player.set_media(media)
                         self.media_player.play()
-                    newTitle = self.media_player.get_media().get_mrl()
-                    newTitle = unquote(newTitle).split("/")[-1]
-                    if newTitle != currentTitle:
-                        print('Playing - "%s"' % newTitle)
-                        currentTitle = newTitle
-                    time.sleep(0.5)
+                        newTitle = self.media_player.get_media().get_mrl()
+                        newTitle = unquote(newTitle).split("/")[-1]
+                        if newTitle != currentTitle:
+                            print('Playing - "%s"' % newTitle)
+                            currentTitle = newTitle
+                    elif state == vlc.State.Error:
+                        messagebox.showerror("Error", get_message('PLAYBACK_ERR', sys_lang))
+                        break
 
 def main(path=None, nostalgia=None):
     """ Main function """
@@ -139,11 +145,7 @@ def main(path=None, nostalgia=None):
         if not path:
             sys.exit(0)
     if not nostalgia:
-        if sys_lang == "es":
-            msg = "¿Activar nostalgia?"
-        else:
-            msg = "Enable nostalgia? (Note this will make sense for Arg people mostly)"
-        isNostalgic = messagebox.askyesno("Nostalgia", msg)
+        isNostalgic = messagebox.askyesno("Nostalgia", get_message('NOSTALGIA', sys_lang))
     else:
         isNostalgic = (nostalgia.lower() == "y")
     ChapterRandomizer(path, isNostalgic)
