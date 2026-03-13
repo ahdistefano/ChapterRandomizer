@@ -98,25 +98,35 @@ class ChapterRandomizer():
 
         media = vlc.Media(file)
 
+        basePath = pathlib.Path(__file__).parent.resolve()
+        logoPath = os.path.join(basePath, "assets", "t3lef3.png")
+
         if sys.platform=="win32":
             options = ["--no-xlib", "--codec=av1", "--avcodec-hw=dxva2", "--verbose=2"]
         elif sys.platform=="linux":
-            options = ["--no-xlib", "--codec=avcodec", "--avcodec-hw=any", "--verbose=0"]
-            #options = ["--no-xlib", "--avcodec-hw=vaapi", "--verbose=0"]
+            options = ["--no-xlib", "--codec=av1", "--avcodec-hw=none", "--verbose=0",
+                       "--avcodec-threads=4", "--avcodec-skiploopfilter=all",
+                       "--avcodec-fast", "--drop-late-frames", "--skip-frames"]
         else:
             options = ["--no-xlib", "--verbose=0",]
+
+        if self.isNostalgic:
+            options += [
+                "--sub-source=logo",
+                f"--logo-file={logoPath}",
+                "--logo-position=6",
+            ]
 
         self.instance = vlc.Instance(options)
         self.media_player = self.instance.media_player_new()
 
         with keep.presenting():
-
-            if self.isNostalgic:
-                basePath = pathlib.Path(__file__).parent.resolve()
-                logoPath = os.path.join(basePath, "assets", "t3lef3.png")
-                self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
+            
+            if self.isNostalgic and sys.platform == "win32":
                 self.media_player.video_set_logo_string(vlc.VideoLogoOption.logo_file, logoPath)
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_position, 6)
+                self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
+
             self.media_player.set_media(media)
             self.media_player.set_fullscreen(True)
             self.media_player.play()
