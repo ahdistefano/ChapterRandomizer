@@ -6,6 +6,7 @@ if getattr(sys, 'frozen', False):
     app_path = os.path.join(os.path.dirname(sys.executable),"lib")
     sys.path.append(app_path) # search this path for modules
 import time
+import pathlib
 import random
 import argparse
 import glob
@@ -111,7 +112,8 @@ class ChapterRandomizer():
         with keep.presenting():
 
             if self.isNostalgic:
-                logoPath = os.path.abspath("./assets/t3lef3.png")
+                basePath = pathlib.Path(__file__).parent.resolve()
+                logoPath = os.path.join(basePath, "assets", "t3lef3.png")
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
                 self.media_player.video_set_logo_string(vlc.VideoLogoOption.logo_file, logoPath)
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_position, 6)
