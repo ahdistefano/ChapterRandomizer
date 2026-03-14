@@ -1,4 +1,4 @@
-pynput==1.8.0
+pynput==1.8.1
 python-vlc==3.0.21203
 wakepy==1.0.0
 Pillow==12.1.1
