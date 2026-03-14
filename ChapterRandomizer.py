@@ -101,6 +101,8 @@ class ChapterRandomizer():
             media = vlc.Media(file)
             self.media_player.set_media(media)
             self.media_player.play()
+            if self.isNostalgic:
+                self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
             newTitle = self.media_player.get_media().get_mrl()
             newTitle = unquote(newTitle).split("/")[-1]
             if newTitle != currentTitle:
@@ -118,7 +120,7 @@ class ChapterRandomizer():
         media = vlc.Media(file)
 
         basePath = pathlib.Path(__file__).parent.resolve()
-        logoPath = os.path.join(basePath, "assets", "t3lef3.png")
+        self.logoPath = os.path.join(basePath, "assets", "t3lef3.png")
 
         is_wsl = sys.platform == "linux" and "microsoft" in os.uname().release.lower()
 
@@ -141,7 +143,7 @@ class ChapterRandomizer():
         if self.isNostalgic:
             options += [
                 "--sub-source=logo",
-                f"--logo-file={logoPath}",
+                f"--logo-file={self.logoPath}",
                 "--logo-position=6",
             ]
 
@@ -158,8 +160,8 @@ class ChapterRandomizer():
 
         with keep.presenting():
             
-            if self.isNostalgic and sys.platform == "win32":
-                self.media_player.video_set_logo_string(vlc.VideoLogoOption.logo_file, logoPath)
+            if self.isNostalgic:
+                self.media_player.video_set_logo_string(vlc.VideoLogoOption.logo_file, self.logoPath)
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_position, 6)
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
 
