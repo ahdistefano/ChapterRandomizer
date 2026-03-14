@@ -11,7 +11,7 @@ import random
 import argparse
 import glob
 import locale
-from tkinter import Tk, filedialog, messagebox
+from tkinter import Tk, Toplevel, filedialog, messagebox
 from urllib.parse import unquote
 from wakepy import keep
 from pynput.keyboard import Key, Listener
@@ -31,10 +31,11 @@ except Exception:
 class ChapterRandomizer():
     """ Main class for the chapter randomizer """
 
-    def __init__(self, folderPath=None, isNostalgic=False):
+    def __init__(self, folderPath=None, isNostalgic=False, tk_root=None):
         self.folderPath = folderPath
         self.isNostalgic = isNostalgic
         self.media_player = None
+        self.tk_root = tk_root
         if self.folderPath:
             self.validatePath()
             self.validateVLC()
@@ -119,8 +120,17 @@ class ChapterRandomizer():
         basePath = pathlib.Path(__file__).parent.resolve()
         logoPath = os.path.join(basePath, "assets", "t3lef3.png")
 
+        is_wsl = sys.platform == "linux" and "microsoft" in os.uname().release.lower()
+
         if sys.platform=="win32":
             options = ["--no-xlib", "--codec=av1", "--avcodec-hw=dxva2", "--verbose=2"]
+        elif is_wsl:
+            # WSLg's Wayland compositor doesn't implement wl_shell set_fullscreen.
+            # We embed VLC into a tkinter Toplevel window instead (tkinter has a
+            # working X11 connection via XWayland even when VLC's xcb_window doesn't).
+            options = ["--codec=av1", "--avcodec-hw=none", "--verbose=0",
+                       "--avcodec-threads=4", "--avcodec-skiploopfilter=all",
+                       "--avcodec-fast", "--drop-late-frames", "--skip-frames"]
         elif sys.platform=="linux":
             options = ["--no-xlib", "--codec=av1", "--avcodec-hw=none", "--verbose=0",
                        "--avcodec-threads=4", "--avcodec-skiploopfilter=all",
@@ -138,6 +148,14 @@ class ChapterRandomizer():
         self.instance = vlc.Instance(options)
         self.media_player = self.instance.media_player_new()
 
+        video_win = None
+        if is_wsl and self.tk_root:
+            video_win = Toplevel(self.tk_root)
+            video_win.attributes('-fullscreen', True)
+            video_win.configure(background='black')
+            video_win.update()
+            self.media_player.set_xwindow(video_win.winfo_id())
+
         with keep.presenting():
             
             if self.isNostalgic and sys.platform == "win32":
@@ -146,7 +164,8 @@ class ChapterRandomizer():
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
 
             self.media_player.set_media(media)
-            self.media_player.set_fullscreen(True)
+            if not is_wsl:
+                self.media_player.set_fullscreen(True)
             self.media_player.play()
 
             currentTitle = ''
@@ -155,6 +174,8 @@ class ChapterRandomizer():
                     with Listener(on_press=self.on_press, on_release=self.on_release):
                         while True:
                             currentTitle = self._playback_loop(currentTitle)
+                            if video_win:
+                                video_win.update()
                             time.sleep(0.5)
                 except Exception as e:
                     # Xlib drops the display connection after long runtimes on Linux;
@@ -167,7 +188,8 @@ class ChapterRandomizer():
 
 def main(path=None, nostalgia=None):
     """ Main function """
-    Tk().withdraw()
+    tk_root = Tk()
+    tk_root.withdraw()
     if not path:
         path = filedialog.askdirectory()
         if not path:
@@ -176,7 +198,7 @@ def main(path=None, nostalgia=None):
         isNostalgic = messagebox.askyesno("Nostalgia", get_message('NOSTALGIA', sys_lang))
     else:
         isNostalgic = (nostalgia.lower() == "y")
-    ChapterRandomizer(path, isNostalgic)
+    ChapterRandomizer(path, isNostalgic, tk_root)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Set the full folder path containing the chapters you want to shuffle.")
