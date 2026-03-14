@@ -92,6 +92,24 @@ class ChapterRandomizer():
         elif key == Key.space:
             self.media_player.pause()
 
+    def _playback_loop(self, currentTitle):
+        """ Inner polling loop; returns updated currentTitle or raises on playback error """
+        state = self.media_player.get_state()
+        if state.value == vlc.State.Ended:
+            file = self.chooseRandomFile()
+            media = vlc.Media(file)
+            self.media_player.set_media(media)
+            self.media_player.play()
+            newTitle = self.media_player.get_media().get_mrl()
+            newTitle = unquote(newTitle).split("/")[-1]
+            if newTitle != currentTitle:
+                print('Playing - "%s"' % newTitle)
+                currentTitle = newTitle
+        elif state == vlc.State.Error:
+            messagebox.showerror("Error", get_message('PLAYBACK_ERR', sys_lang))
+            sys.exit(1)
+        return currentTitle
+
     def main(self):
         """ This does the whole thing """
         file = self.chooseRandomFile()
@@ -132,22 +150,20 @@ class ChapterRandomizer():
             self.media_player.play()
 
             currentTitle = ''
-            with Listener(on_press=self.on_press, on_release=self.on_release):
-                while True:
-                    state = self.media_player.get_state()
-                    if state.value == vlc.State.Ended:
-                        file = self.chooseRandomFile()
-                        media = vlc.Media(file)
-                        self.media_player.set_media(media)
-                        self.media_player.play()
-                        newTitle = self.media_player.get_media().get_mrl()
-                        newTitle = unquote(newTitle).split("/")[-1]
-                        if newTitle != currentTitle:
-                            print('Playing - "%s"' % newTitle)
-                            currentTitle = newTitle
-                    elif state == vlc.State.Error:
-                        messagebox.showerror("Error", get_message('PLAYBACK_ERR', sys_lang))
-                        break
+            while True:
+                try:
+                    with Listener(on_press=self.on_press, on_release=self.on_release):
+                        while True:
+                            currentTitle = self._playback_loop(currentTitle)
+                            time.sleep(0.5)
+                except Exception as e:
+                    # Xlib drops the display connection after long runtimes on Linux;
+                    # recreating the Listener reopens the connection transparently.
+                    if "ConnectionClosedError" in type(e).__name__ or "Broken pipe" in str(e):
+                        print("X display connection lost, reconnecting keyboard listener...")
+                        time.sleep(2)
+                        continue
+                    raise e
 
 def main(path=None, nostalgia=None):
     """ Main function """
