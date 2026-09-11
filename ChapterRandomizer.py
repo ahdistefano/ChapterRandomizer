@@ -12,7 +12,6 @@ import argparse
 import glob
 import locale
 from tkinter import Tk, filedialog, messagebox
-from urllib.parse import unquote
 from wakepy import keep
 from pynput.keyboard import Key, Listener
 from messages import get_message
@@ -99,11 +98,11 @@ class ChapterRandomizer():
             file = self.chooseRandomFile()
             media = vlc.Media(file)
             self.media_player.set_media(media)
+            media.release()
             self.media_player.play()
-            newTitle = self.media_player.get_media().get_mrl()
-            newTitle = unquote(newTitle).split("/")[-1]
+            newTitle = os.path.basename(file)
             if newTitle != currentTitle:
-                print('Playing - "%s"' % newTitle)
+                print('Playing - "%s"' % newTitle, flush=True)
                 currentTitle = newTitle
         elif state == vlc.State.Error:
             messagebox.showerror("Error", get_message('PLAYBACK_ERR', sys_lang))
@@ -146,6 +145,7 @@ class ChapterRandomizer():
                 self.media_player.video_set_logo_int(vlc.VideoLogoOption.logo_enable, 1)
 
             self.media_player.set_media(media)
+            media.release()
             self.media_player.set_fullscreen(True)
             self.media_player.play()
 
@@ -160,7 +160,7 @@ class ChapterRandomizer():
                     # Xlib drops the display connection after long runtimes on Linux;
                     # recreating the Listener reopens the connection transparently.
                     if "ConnectionClosedError" in type(e).__name__ or "Broken pipe" in str(e):
-                        print("X display connection lost, reconnecting keyboard listener...")
+                        print("X display connection lost, reconnecting keyboard listener...", flush=True)
                         time.sleep(2)
                         continue
                     raise e
